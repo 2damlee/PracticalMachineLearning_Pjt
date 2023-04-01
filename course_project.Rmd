@@ -1,0 +1,150 @@
+---
+title: "Machine learning course project"
+author: "Joy"
+date: "2023-03-31"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## 
+
+## Introduction
+
+#### background
+
+Using devices such as *Jawbone Up*, *Nike FuelBand*, and *Fitbit* it is now possible to collect a large amount of data about personal activity relatively inexpensively. These type of devices are part of the quantified self movement -- a group of enthusiasts who take measurements about themselves regularly to improve their health, to find patterns in their behavior, or because they are tech geeks. One thing that people regularly do is quantify how *much* of a particular activity they do, but they rarely quantify *how well they do it*. In this project, your goal will be to use data from accelerometers on the belt, forearm, arm, and dumbell of 6 participants. They were asked to perform barbell lifts correctly and incorrectly in 5 different ways. More information is available from the website here: <http://web.archive.org/web/20161224072740/http:/groupware.les.inf.puc-rio.br/har> (see the section on the Weight Lifting Exercise Dataset).
+
+\
+**Data**
+
+The training data for this project are available here:
+
+[[https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv]{.underline}](https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv)
+
+The test data are available here:
+
+<https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv>
+
+\
+
+## Loading Data
+
+```{r}
+library(lattice)
+library(ggplot2)
+library(caret)
+library(kernlab)
+library(rattle)
+library(corrplot)
+set.seed(1234)
+
+
+traincsv <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv")
+testcsv <- read.csv("https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv")
+
+dim(traincsv)
+```
+
+```{r}
+dim(testcsv)
+```
+
+## Cleaning the Data
+
+Removing unnecessary data with N/A variables
+
+```{r}
+traincsv <- traincsv[,colMeans(is.na(traincsv)) < .9]
+traincsv <- traincsv[,-c(1:7)]
+```
+
+```{r}
+nvz <- nearZeroVar(traincsv)
+traincsv <- traincsv[,-nvz]
+dim(traincsv)
+```
+
+Split the training set into a validation and training set.
+
+```{r}
+inTrain <- createDataPartition(y=traincsv$classe, p=0.7, list=F)
+train <- traincsv[inTrain,]
+valid <- traincsv[-inTrain,]
+```
+
+## Testing the Models
+
+We will be testing several commonly used models, namely Decision Trees, Random Forest, Gradient Boosted Trees, and SVM. Although we may not necessarily need to test all of them, we will run all of them for comparison purposes and to improve our skills. Additionally, we will use 3-fold cross validation as a means of controlling the training process.
+
+```{r}
+control <- trainControl(method="cv", number=3, verboseIter=F)
+```
+
+#### Decision Tree
+
+```{r}
+mod_trees <- train(classe~., data=train, method="rpart", trControl = control, tuneLength = 5)
+fancyRpartPlot(mod_trees$finalModel)
+```
+
+###### 
+
+#### Prediction
+
+```{r}
+pred_trees <- predict(mod_trees, valid)
+cmtrees <- confusionMatrix(pred_trees, factor(valid$classe))
+cmtrees
+```
+
+### Random Forest
+
+```{r}
+mod_rf <- train(classe~., data=train, method="rf", trControl = control, tuneLength = 5)
+
+pred_rf <- predict(mod_rf, valid)
+cmrf <- confusionMatrix(pred_rf, factor(valid$classe))
+cmrf
+```
+
+### **Gradient Boosted Trees**
+
+```{r}
+mod_gbm <- train(classe~., data=train, method="gbm", trControl = control, tuneLength = 5, verbose = F)
+
+pred_gbm <- predict(mod_gbm, valid)
+cmgbm <- confusionMatrix(pred_gbm, factor(valid$classe))
+cmgbm
+```
+
+\
+
+### Support Vector Machine
+
+```{r}
+mod_svm <- train(classe~., data=train, method="svmLinear", trControl = control, tuneLength = 5, verbose = F)
+
+pred_svm <- predict(mod_svm, valid)
+cmsvm <- confusionMatrix(pred_svm, factor(valid$classe))
+cmsvm
+```
+
+## Results
+
+The best model is the Random Forest model
+
+         accuracy oos_error
+    Tree    0.537     0.463
+    RF      0.996     0.004
+    GBM     0.992     0.008
+    SVM     0.781     0.219
+
+Using the test set to prdedict the classes outcome for 20 cases with teh Random Forest model
+
+```{r}
+pred <- predict(mod_rf, testcsv)
+print(pred)
+```
